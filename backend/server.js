@@ -8,10 +8,14 @@ const port = process.env.PORT || 4000;
 const cors = require('cors');
 const db = require('./db/conn');
 
+// routes
 const registerRoutes = require('./routes/register');
 const loginRoutes = require('./routes/login');
 const logoutRoutes = require('./routes/logout');
 const homeRoutes = require('./routes/home');
+const accountsRoutes = require('./routes/accounts');
+const transactionsRoutes = require('./routes/transaction');
+const summaryRoutes = require('./routes/summary');
 app.use(cors(
     {
         origin: "http://localhost:3000",
@@ -35,6 +39,9 @@ app.use('/', registerRoutes);
 app.use('/', loginRoutes);
 app.use('/', logoutRoutes);
 app.use('/', homeRoutes);
+app.use('/', accountsRoutes);
+app.use('/', transactionsRoutes);
+app.use('/', summaryRoutes);
 app.get('/', (req, res) => {
     res.send('Hello World!');
 });

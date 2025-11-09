@@ -32,7 +32,7 @@ registerRoutes.post('/register', async (req, res) => {
             }
         };
         let hashedPassword = hash(password, salt);
-        const user = { username, password: hashedPassword, salt, accounts: [
+        const user = { publicId: "ACC" +((Math.random(0 , 1) * 9000 + 1000).toFixed(0)) ,username, password: hashedPassword, salt, accounts: [
             { account_number: 1, label: "Checking", balance: 0 },
             { account_number: 2, label: "Savings", balance: 0 },
             { account_number: 3, label: "Other", balance: 0 },

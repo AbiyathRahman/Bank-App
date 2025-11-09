@@ -4,7 +4,7 @@ export default function NavBar() {
   return (
     <nav className="nav">
       <div className="nav-inner">
-        <div className="brand">Banking App</div>
+        <div className="brand">Bank</div>
         <div className="nav-links">
           <NavLink to="/" end>
             Dashboard

@@ -18,6 +18,12 @@ export default function Login() {
           </p>
         </div>
       </div>
+      <div className="col-6">
+        <div className="card">
+          <h2>Why this page?</h2>
+          <p>Layout-only login screen with simple inputs and a button.</p>
+        </div>
+      </div>
     </div>
   );
 }

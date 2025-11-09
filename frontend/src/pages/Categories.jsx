@@ -11,6 +11,9 @@ export default function Categories() {
             />
             <button className="btn">Add</button>
           </div>
+          <p style={{ color: "var(--muted)", marginTop: 8 }}>
+            New categories should appear instantly in money forms.
+          </p>
         </div>
       </div>
       <div className="col-6">

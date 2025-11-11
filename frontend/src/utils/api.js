@@ -38,16 +38,6 @@ export const api = {
     return response.json();
   },
 
-  updateAccountLabel: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/update-name`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ accName: data.label }),
-    });
-    return response.json();
-  },
-
   // Transaction endpoints
   getTransactions: async () => {
     const response = await fetch(`${API_BASE_URL}/transactions`, {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import TransactionModal from "./TransactionModal";
+import TransactionModal from "../components/TransactionModal";
 import { api } from "../utils/api";
 
 export default function AccountCard({ account, onUpdate }) {

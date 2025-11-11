@@ -1,6 +1,6 @@
 const express = require('express');
 const MongoStore = require('connect-mongo');
-require('dotenv').config({ path: './.env'});
+require('dotenv').config({ path: './config.env'});
 const session = require('express-session');
 const app = express();
 
@@ -18,7 +18,7 @@ const transactionsRoutes = require('./routes/transaction');
 const summaryRoutes = require('./routes/summary');
 app.use(cors(
     {
-        origin: "http://localhost:3000",
+        origin: "http://localhost:5173",
         methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
         credentials:true,
         optionsSuccessStatus: 204,

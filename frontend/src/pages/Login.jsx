@@ -1,35 +1,34 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { api } from "../utils/api";
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    // TODO: Connect to backend API
-    if (username && password) {
-      const userData = {
-        userId: "123",
-        username: username,
-        accounts: [
-          { id: 1, name: "Checking", balance: 1245.67 },
-          { id: 2, name: "Savings", balance: 3420.0 },
-          { id: 3, name: "Other", balance: 250.0, customName: "" },
-        ],
-        categories: ["Food", "Bills", "Entertainment", "Savings", "Paycheck"],
-        transactions: [],
-      };
-      login(userData);
-      navigate("/");
-    } else {
-      setError("Please enter username and password");
+    try {
+      const data = await api.login({ username, password });
+
+      if (data.message === "Login successful") {
+        login();
+        navigate("/");
+      } else {
+        setError(data.message || "Login failed");
+      }
+    } catch (error) {
+      setError("Unable to connect to server");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,6 +49,7 @@ export default function Login() {
               placeholder="Username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              disabled={loading}
             />
             <input
               className="input"
@@ -57,9 +57,11 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
+              onKeyPress={(e) => e.key === "Enter" && handleSubmit(e)}
             />
-            <button className="btn" onClick={handleSubmit}>
-              Sign In
+            <button className="btn" onClick={handleSubmit} disabled={loading}>
+              {loading ? "Signing In..." : "Sign In"}
             </button>
           </div>
           <p style={{ marginTop: 12, color: "var(--muted)" }}>
@@ -72,14 +74,10 @@ export default function Login() {
       </div>
       <div className="col-6">
         <div className="card">
-          <h2>Demo Mode</h2>
-          <p>
-            Enter any username and password to login (backend not connected
-            yet).
-          </p>
+          <h2>Secure Login</h2>
+          <p>Your credentials are protected with password hashing and salt.</p>
           <p style={{ marginTop: 12, color: "var(--muted)" }}>
-            When backend is connected, this will verify credentials with
-            password hashing.
+            All connections are secured through session management.
           </p>
         </div>
       </div>

@@ -1,8 +1,33 @@
-import { useAuth } from "../contexts/AuthContext";
+export default function RecentTransactions({ transactions, accounts }) {
+  const recentTransactions = transactions.slice(0, 10);
 
-export default function RecentTransactions() {
-  const { user } = useAuth();
-  const recentTransactions = user.transactions.slice(0, 10);
+  const getAccountLabel = (accountNumber) => {
+    const account = accounts.find((a) => a.account_number === accountNumber);
+    return account ? account.label : `Account ${accountNumber}`;
+  };
+
+  const formatTransactionType = (type) => {
+    switch (type) {
+      case "transfer-in":
+        return "Transfer In";
+      case "transfer-out":
+        return "Transfer Out";
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  };
+
+  const getAmountColor = (type) => {
+    if (type === "deposit" || type === "transfer-in") return "#51cf66";
+    if (type === "withdrawal" || type === "transfer-out") return "#ff6b6b";
+    return "var(--ink)";
+  };
+
+  const getAmountPrefix = (type) => {
+    if (type === "deposit" || type === "transfer-in") return "+";
+    if (type === "withdrawal" || type === "transfer-out") return "-";
+    return "";
+  };
 
   return (
     <div className="card">
@@ -26,13 +51,13 @@ export default function RecentTransactions() {
             {recentTransactions.map((tx) => (
               <tr key={tx.id}>
                 <td>{new Date(tx.date).toLocaleString()}</td>
-                <td style={{ textTransform: "capitalize" }}>{tx.type}</td>
-                <td>{tx.account}</td>
+                <td>{formatTransactionType(tx.type)}</td>
+                <td>{getAccountLabel(tx.account_number)}</td>
                 <td>
                   <span className="badge">{tx.category}</span>
                 </td>
-                <td style={{ color: tx.amount >= 0 ? "#51cf66" : "#ff6b6b" }}>
-                  {tx.amount >= 0 ? "+" : ""}${Math.abs(tx.amount).toFixed(2)}
+                <td style={{ color: getAmountColor(tx.type) }}>
+                  {getAmountPrefix(tx.type)}${Math.abs(tx.amount).toFixed(2)}
                 </td>
               </tr>
             ))}

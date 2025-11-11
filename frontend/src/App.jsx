@@ -11,27 +11,36 @@ import History from "./pages/History";
 import Categories from "./pages/Categories";
 import { AuthContext } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { api } from "./utils/api";
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("bankUser");
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+    checkAuth();
   }, []);
 
-  const login = (userData) => {
-    setUser(userData);
-    localStorage.setItem("bankUser", JSON.stringify(userData));
+  const checkAuth = async () => {
+    try {
+      const data = await api.getAccounts();
+      if (data.accounts) {
+        setUser({ loggedIn: true });
+      }
+    } catch (error) {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const logout = () => {
+  const login = () => {
+    setUser({ loggedIn: true });
+  };
+
+  const logout = async () => {
+    await api.logout();
     setUser(null);
-    localStorage.removeItem("bankUser");
   };
 
   if (loading)

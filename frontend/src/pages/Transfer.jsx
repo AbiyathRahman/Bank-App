@@ -1,38 +1,50 @@
-import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useState, useEffect } from "react";
+import { api } from "../utils/api";
 
 export default function Transfer() {
-  const { user, login } = useAuth();
+  const [accounts, setAccounts] = useState([]);
 
   // Internal transfer state
   const [fromAccount, setFromAccount] = useState("");
   const [toAccount, setToAccount] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
-  const [newCategory, setNewCategory] = useState("");
-  const [showNewCategory, setShowNewCategory] = useState(false);
 
   // External transfer state
   const [externalFromAccount, setExternalFromAccount] = useState("");
-  const [targetUserId, setTargetUserId] = useState("");
+  const [receiverPublicID, setReceiverPublicID] = useState("");
   const [targetAccountNum, setTargetAccountNum] = useState("");
   const [externalAmount, setExternalAmount] = useState("");
   const [externalCategory, setExternalCategory] = useState("");
-  const [externalNewCategory, setExternalNewCategory] = useState("");
-  const [showExternalNewCategory, setShowExternalNewCategory] = useState(false);
 
   // UI state
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [externalError, setExternalError] = useState("");
   const [externalSuccess, setExternalSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [externalLoading, setExternalLoading] = useState(false);
 
-  const handleInternalTransfer = (e) => {
+  useEffect(() => {
+    loadAccounts();
+  }, []);
+
+  const loadAccounts = async () => {
+    try {
+      const data = await api.getAccounts();
+      if (data.accounts) {
+        setAccounts(data.accounts);
+      }
+    } catch (error) {
+      console.error("Failed to load accounts", error);
+    }
+  };
+
+  const handleInternalTransfer = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
-    // Validation
     if (!fromAccount || !toAccount) {
       setError("Please select both accounts");
       return;
@@ -49,65 +61,43 @@ export default function Transfer() {
       return;
     }
 
-    const finalCategory = showNewCategory ? newCategory : category;
-    if (!finalCategory) {
-      setError("Please select or create a category");
+    if (!category.trim()) {
+      setError("Please enter a category");
       return;
     }
 
-    const fromAcc = user.accounts.find((a) => a.id === parseInt(fromAccount));
-    if (amountNum > fromAcc.balance) {
-      setError("Insufficient funds");
-      return;
+    setLoading(true);
+
+    try {
+      const data = await api.transferInternal({
+        from_account_number: parseInt(fromAccount),
+        to_account_number: parseInt(toAccount),
+        amount: amountNum,
+        category: category.trim(),
+      });
+
+      if (data.message && data.message.includes("successful")) {
+        setSuccess("Transfer completed successfully!");
+        setAmount("");
+        setCategory("");
+        loadAccounts();
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        setError(data.message || "Transfer failed");
+      }
+    } catch (error) {
+      setError("Unable to process transfer");
+    } finally {
+      setLoading(false);
     }
-
-    // Update user data
-    const updatedUser = { ...user };
-    const fromIndex = updatedUser.accounts.findIndex(
-      (a) => a.id === parseInt(fromAccount)
-    );
-    const toIndex = updatedUser.accounts.findIndex(
-      (a) => a.id === parseInt(toAccount)
-    );
-
-    updatedUser.accounts[fromIndex].balance -= amountNum;
-    updatedUser.accounts[toIndex].balance += amountNum;
-
-    // Add category if new
-    if (showNewCategory && !updatedUser.categories.includes(newCategory)) {
-      updatedUser.categories.push(newCategory);
-    }
-
-    // Add transaction
-    updatedUser.transactions.unshift({
-      id: Date.now(),
-      date: new Date().toISOString(),
-      type: "transfer",
-      account: `${updatedUser.accounts[fromIndex].name} → ${updatedUser.accounts[toIndex].name}`,
-      accountId: parseInt(fromAccount),
-      amount: -amountNum,
-      category: finalCategory,
-    });
-
-    login(updatedUser);
-    setSuccess("Transfer completed successfully!");
-
-    // Clear form
-    setAmount("");
-    setCategory("");
-    setNewCategory("");
-    setShowNewCategory(false);
-
-    setTimeout(() => setSuccess(""), 3000);
   };
 
-  const handleExternalTransfer = (e) => {
+  const handleExternalTransfer = async (e) => {
     e.preventDefault();
     setExternalError("");
     setExternalSuccess("");
 
-    // Validation
-    if (!externalFromAccount || !targetUserId || !targetAccountNum) {
+    if (!externalFromAccount || !receiverPublicID || !targetAccountNum) {
       setExternalError("Please fill in all fields");
       return;
     }
@@ -124,39 +114,42 @@ export default function Transfer() {
       return;
     }
 
-    const finalCategory = showExternalNewCategory
-      ? externalNewCategory
-      : externalCategory;
-    if (!finalCategory) {
-      setExternalError("Please select or create a category");
+    if (!externalCategory.trim()) {
+      setExternalError("Please enter a category");
       return;
     }
 
-    const fromAcc = user.accounts.find(
-      (a) => a.id === parseInt(externalFromAccount)
-    );
-    if (amountNum > fromAcc.balance) {
-      setExternalError("Insufficient funds");
-      return;
+    setExternalLoading(true);
+
+    try {
+      const data = await api.transferExternal({
+        receiverPublicID: receiverPublicID.trim(),
+        from_account_number: parseInt(externalFromAccount),
+        to_account_number: accountNum,
+        amount: amountNum,
+        category: externalCategory.trim(),
+      });
+
+      if (data.message && data.message.includes("successful")) {
+        setExternalSuccess(
+          `Transfer of $${amountNum.toFixed(
+            2
+          )} to User ${receiverPublicID} completed!`
+        );
+        setReceiverPublicID("");
+        setTargetAccountNum("");
+        setExternalAmount("");
+        setExternalCategory("");
+        loadAccounts();
+        setTimeout(() => setExternalSuccess(""), 5000);
+      } else {
+        setExternalError(data.message || "Transfer failed");
+      }
+    } catch (error) {
+      setExternalError("Unable to process transfer");
+    } finally {
+      setExternalLoading(false);
     }
-
-    // TODO: Connect to backend API for external transfers
-    // For now, just show success message
-    setExternalSuccess(
-      `Transfer of $${amountNum.toFixed(
-        2
-      )} to User ${targetUserId}, Account ${targetAccountNum} initiated (backend not connected)`
-    );
-
-    // Clear form
-    setTargetUserId("");
-    setTargetAccountNum("");
-    setExternalAmount("");
-    setExternalCategory("");
-    setExternalNewCategory("");
-    setShowExternalNewCategory(false);
-
-    setTimeout(() => setExternalSuccess(""), 5000);
   };
 
   return (
@@ -191,11 +184,12 @@ export default function Transfer() {
               className="select"
               value={fromAccount}
               onChange={(e) => setFromAccount(e.target.value)}
+              disabled={loading}
             >
               <option value="">Select account...</option>
-              {user.accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name} ({acc.id}) - ${acc.balance.toFixed(2)}
+              {accounts.map((acc) => (
+                <option key={acc.account_number} value={acc.account_number}>
+                  {acc.label} ({acc.account_number}) - ${acc.balance.toFixed(2)}
                 </option>
               ))}
             </select>
@@ -216,11 +210,12 @@ export default function Transfer() {
               className="select"
               value={toAccount}
               onChange={(e) => setToAccount(e.target.value)}
+              disabled={loading}
             >
               <option value="">Select account...</option>
-              {user.accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name} ({acc.id})
+              {accounts.map((acc) => (
+                <option key={acc.account_number} value={acc.account_number}>
+                  {acc.label} ({acc.account_number})
                 </option>
               ))}
             </select>
@@ -244,6 +239,7 @@ export default function Transfer() {
               placeholder="0.00"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              disabled={loading}
             />
           </div>
 
@@ -258,49 +254,23 @@ export default function Transfer() {
             >
               Category
             </label>
-            {!showNewCategory ? (
-              <select
-                className="select"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                <option value="">Select category...</option>
-                {user.categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                className="input"
-                placeholder="New category name"
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-              />
-            )}
+            <input
+              className="input"
+              placeholder="e.g., Savings, Bills"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              disabled={loading}
+            />
           </div>
 
-          <div className="col-6">
-            <button
-              className="btn ghost"
-              onClick={() => setShowNewCategory(!showNewCategory)}
-              type="button"
-              style={{ width: "100%", marginTop: 22 }}
-            >
-              {showNewCategory
-                ? "← Use Existing Category"
-                : "+ Create New Category"}
-            </button>
-          </div>
-
-          <div className="col-6">
+          <div className="col-12">
             <button
               className="btn"
               onClick={handleInternalTransfer}
-              style={{ width: "100%", marginTop: 22 }}
+              disabled={loading}
+              style={{ width: "100%" }}
             >
-              Transfer Money
+              {loading ? "Processing..." : "Transfer Money"}
             </button>
           </div>
         </div>
@@ -316,8 +286,7 @@ export default function Transfer() {
       >
         <h2>To Another User</h2>
         <p style={{ color: "var(--muted)", marginBottom: 16 }}>
-          Transfer money to another user's account (requires User ID and Account
-          Number)
+          Transfer money to another user's account using their Public ID
         </p>
 
         {externalError && (
@@ -345,11 +314,12 @@ export default function Transfer() {
               className="select"
               value={externalFromAccount}
               onChange={(e) => setExternalFromAccount(e.target.value)}
+              disabled={externalLoading}
             >
               <option value="">Select account...</option>
-              {user.accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name} - ${acc.balance.toFixed(2)}
+              {accounts.map((acc) => (
+                <option key={acc.account_number} value={acc.account_number}>
+                  {acc.label} - ${acc.balance.toFixed(2)}
                 </option>
               ))}
             </select>
@@ -364,13 +334,14 @@ export default function Transfer() {
                 color: "var(--muted)",
               }}
             >
-              Target User ID
+              Receiver Public ID
             </label>
             <input
               className="input"
-              placeholder="e.g., 456"
-              value={targetUserId}
-              onChange={(e) => setTargetUserId(e.target.value)}
+              placeholder="e.g., ACC1234"
+              value={receiverPublicID}
+              onChange={(e) => setReceiverPublicID(e.target.value)}
+              disabled={externalLoading}
             />
           </div>
 
@@ -393,6 +364,7 @@ export default function Transfer() {
               placeholder="1, 2, or 3"
               value={targetAccountNum}
               onChange={(e) => setTargetAccountNum(e.target.value)}
+              disabled={externalLoading}
             />
           </div>
 
@@ -414,6 +386,7 @@ export default function Transfer() {
               placeholder="0.00"
               value={externalAmount}
               onChange={(e) => setExternalAmount(e.target.value)}
+              disabled={externalLoading}
             />
           </div>
 
@@ -428,69 +401,25 @@ export default function Transfer() {
             >
               Category
             </label>
-            {!showExternalNewCategory ? (
-              <select
-                className="select"
-                value={externalCategory}
-                onChange={(e) => setExternalCategory(e.target.value)}
-              >
-                <option value="">Select category...</option>
-                {user.categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                className="input"
-                placeholder="New category name"
-                value={externalNewCategory}
-                onChange={(e) => setExternalNewCategory(e.target.value)}
-              />
-            )}
+            <input
+              className="input"
+              placeholder="e.g., Payment, Gift"
+              value={externalCategory}
+              onChange={(e) => setExternalCategory(e.target.value)}
+              disabled={externalLoading}
+            />
           </div>
 
-          <div className="col-6">
-            <button
-              className="btn ghost"
-              onClick={() =>
-                setShowExternalNewCategory(!showExternalNewCategory)
-              }
-              type="button"
-              style={{ width: "100%" }}
-            >
-              {showExternalNewCategory
-                ? "← Use Existing Category"
-                : "+ Create New Category"}
-            </button>
-          </div>
-
-          <div className="col-6">
+          <div className="col-12">
             <button
               className="btn"
               onClick={handleExternalTransfer}
+              disabled={externalLoading}
               style={{ width: "100%" }}
             >
-              Send to User
+              {externalLoading ? "Processing..." : "Send to User"}
             </button>
           </div>
-        </div>
-
-        <div
-          style={{
-            marginTop: 16,
-            padding: 12,
-            background: "rgba(255, 198, 55, 0.1)",
-            border: "1px solid rgba(255, 198, 55, 0.3)",
-            borderRadius: 8,
-          }}
-        >
-          <p style={{ margin: 0, fontSize: "0.9rem", color: "#ffc637" }}>
-            ⚠️ Note: External transfers require backend API connection to
-            complete. This feature will be fully functional once connected to
-            your server.
-          </p>
         </div>
       </div>
     </div>

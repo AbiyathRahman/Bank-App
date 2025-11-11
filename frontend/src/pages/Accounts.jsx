@@ -1,22 +1,45 @@
-import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useState, useEffect } from "react";
+import { api } from "../utils/api";
 import AccountCard from "../components/AccountCard";
 
 export default function Accounts() {
-  const { user, login } = useAuth();
-  const [customName, setCustomName] = useState("");
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const handleRename = () => {
-    if (!customName.trim()) return;
+  useEffect(() => {
+    loadAccounts();
+  }, []);
 
-    const updatedUser = { ...user };
-    const otherAccount = updatedUser.accounts.find((a) => a.id === 3);
-    if (otherAccount) {
-      otherAccount.customName = customName;
+  const loadAccounts = async () => {
+    try {
+      const data = await api.getAccounts();
+      if (data.accounts) {
+        setAccounts(data.accounts);
+      }
+    } catch (error) {
+      setError("Failed to load accounts");
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
-    login(updatedUser);
-    setCustomName("");
   };
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40, textAlign: "center" }}>
+        Loading accounts...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: "#ff6b6b" }}>
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="grid">
@@ -24,30 +47,18 @@ export default function Accounts() {
         <h1 className="section-title">Manage Accounts</h1>
       </div>
 
-      {user.accounts.map((account) => (
-        <div className="col-4" key={account.id}>
-          <AccountCard account={account} />
+      {accounts.map((account) => (
+        <div className="col-4" key={account.account_number}>
+          <AccountCard account={account} onUpdate={loadAccounts} />
         </div>
       ))}
 
-      <div className="col-6">
+      <div className="col-12">
         <div className="card">
-          <h2>Rename "Other" Account</h2>
-          <input
-            className="input"
-            placeholder="e.g., Travel, Projects, Gifts"
-            value={customName}
-            onChange={(e) => setCustomName(e.target.value)}
-          />
-          <div style={{ marginTop: 10 }}>
-            <button className="btn" onClick={handleRename}>
-              Save Name
-            </button>
-          </div>
-          <p
-            style={{ color: "var(--muted)", marginTop: 8, fontSize: "0.9rem" }}
-          >
-            Current: {user.accounts[2].customName || "Other"}
+          <h2>Account Information</h2>
+          <p style={{ color: "var(--muted)" }}>
+            You have three accounts: Checking (1), Savings (2), and Other (3).
+            Use these account numbers when making transfers.
           </p>
         </div>
       </div>

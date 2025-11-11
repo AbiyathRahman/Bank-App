@@ -1,86 +1,84 @@
-import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import CategoryUsageStats from "../components/CategoryUsageStats";
+import { useState, useEffect } from "react";
+import { api } from "../utils/api";
 
 export default function Categories() {
-  const { user, login } = useAuth();
-  const [newCategory, setNewCategory] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleAddCategory = () => {
-    setError("");
-    setSuccess("");
+  useEffect(() => {
+    loadData();
+  }, []);
 
-    if (!newCategory.trim()) {
-      setError("Please enter a category name");
-      return;
+  const loadData = async () => {
+    try {
+      const data = await api.getTransactions();
+      if (data.transactions) {
+        setTransactions(data.transactions);
+      }
+    } catch (error) {
+      console.error("Failed to load transactions", error);
+    } finally {
+      setLoading(false);
     }
-
-    if (user.categories.includes(newCategory.trim())) {
-      setError("Category already exists");
-      return;
-    }
-
-    const updatedUser = { ...user };
-    updatedUser.categories.push(newCategory.trim());
-    login(updatedUser);
-    setSuccess("Category added successfully!");
-    setNewCategory("");
-
-    setTimeout(() => setSuccess(""), 3000);
   };
 
-  const handleDeleteCategory = (categoryToDelete) => {
-    if (!window.confirm(`Delete category "${categoryToDelete}"?`)) return;
+  // Get unique categories from transactions
+  const categories = [...new Set(transactions.map((tx) => tx.category))];
 
-    const updatedUser = { ...user };
-    updatedUser.categories = updatedUser.categories.filter(
-      (c) => c !== categoryToDelete
+  // Calculate category statistics
+  const categoryStats = {};
+  transactions.forEach((tx) => {
+    if (!categoryStats[tx.category]) {
+      categoryStats[tx.category] = {
+        count: 0,
+        totalIn: 0,
+        totalOut: 0,
+      };
+    }
+    categoryStats[tx.category].count++;
+
+    if (tx.type === "deposit" || tx.type === "transfer-in") {
+      categoryStats[tx.category].totalIn += tx.amount;
+    } else if (tx.type === "withdrawal" || tx.type === "transfer-out") {
+      categoryStats[tx.category].totalOut += tx.amount;
+    }
+  });
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40, textAlign: "center" }}>
+        Loading categories...
+      </div>
     );
-    login(updatedUser);
-  };
+  }
 
   return (
     <div className="grid">
       <div className="col-12">
-        <h1 className="section-title">Manage Categories</h1>
+        <h1 className="section-title">Transaction Categories</h1>
       </div>
 
       <div className="col-6">
         <div className="card">
-          <h2>Create New Category</h2>
-          {error && (
-            <p style={{ color: "#ff6b6b", marginBottom: 12 }}>{error}</p>
-          )}
-          {success && (
-            <p style={{ color: "#51cf66", marginBottom: 12 }}>{success}</p>
-          )}
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              className="input"
-              placeholder="e.g., Food, Bills, Entertainment"
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleAddCategory()}
-            />
-            <button className="btn" onClick={handleAddCategory}>
-              Add
-            </button>
-          </div>
-          <p style={{ color: "var(--muted)", marginTop: 8 }}>
-            Categories appear instantly in all deposit/withdrawal/transfer
-            forms.
+          <h2>How Categories Work</h2>
+          <p style={{ color: "var(--muted)" }}>
+            Categories are created automatically when you perform transactions.
+            Simply enter a category name when depositing, withdrawing, or
+            transferring money.
+          </p>
+          <p style={{ color: "var(--muted)", marginTop: 12 }}>
+            Categories help you track where your money is going and organize
+            your finances.
           </p>
         </div>
       </div>
 
       <div className="col-6">
         <div className="card">
-          <h2>My Categories ({user.categories.length})</h2>
-          {user.categories.length === 0 ? (
+          <h2>My Categories ({categories.length})</h2>
+          {categories.length === 0 ? (
             <p style={{ color: "var(--muted)" }}>
-              No categories yet. Create one!
+              No categories yet. Create one by making a transaction!
             </p>
           ) : (
             <div
@@ -91,7 +89,7 @@ export default function Categories() {
                 marginTop: 8,
               }}
             >
-              {user.categories.map((cat) => (
+              {categories.sort().map((cat) => (
                 <div
                   key={cat}
                   style={{
@@ -105,18 +103,9 @@ export default function Categories() {
                   }}
                 >
                   <span>{cat}</span>
-                  <button
-                    onClick={() => handleDeleteCategory(cat)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "#ff6b6b",
-                      cursor: "pointer",
-                      padding: "4px 8px",
-                    }}
-                  >
-                    Delete
-                  </button>
+                  <span className="badge">
+                    {categoryStats[cat].count} transactions
+                  </span>
                 </div>
               ))}
             </div>
@@ -127,7 +116,45 @@ export default function Categories() {
       <div className="col-12">
         <div className="card">
           <h2>Category Usage Statistics</h2>
-          <CategoryUsageStats />
+          {Object.keys(categoryStats).length === 0 ? (
+            <p style={{ color: "var(--muted)" }}>No transaction data yet</p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Transactions</th>
+                  <th>Total In</th>
+                  <th>Total Out</th>
+                  <th>Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(categoryStats)
+                  .sort((a, b) => b[1].count - a[1].count)
+                  .map(([category, stats]) => {
+                    const net = stats.totalIn - stats.totalOut;
+                    return (
+                      <tr key={category}>
+                        <td>
+                          <span className="badge">{category}</span>
+                        </td>
+                        <td>{stats.count}</td>
+                        <td style={{ color: "#51cf66" }}>
+                          +${stats.totalIn.toFixed(2)}
+                        </td>
+                        <td style={{ color: "#ff6b6b" }}>
+                          -${stats.totalOut.toFixed(2)}
+                        </td>
+                        <td style={{ color: net >= 0 ? "#51cf66" : "#ff6b6b" }}>
+                          {net >= 0 ? "+" : ""}${net.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

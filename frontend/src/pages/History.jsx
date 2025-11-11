@@ -1,18 +1,78 @@
-import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useState, useEffect } from "react";
+import { api } from "../utils/api";
 
 export default function History() {
-  const { user } = useAuth();
+  const [transactions, setTransactions] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [filterAccount, setFilterAccount] = useState("all");
   const [filterCategory, setFilterCategory] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const filteredTransactions = user.transactions.filter((tx) => {
-    if (filterAccount !== "all" && tx.accountId !== parseInt(filterAccount)) {
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [transactionsData, accountsData] = await Promise.all([
+        api.getTransactions(),
+        api.getAccounts(),
+      ]);
+
+      if (transactionsData.transactions) {
+        setTransactions(transactionsData.transactions);
+      }
+      if (accountsData.accounts) {
+        setAccounts(accountsData.accounts);
+      }
+    } catch (error) {
+      console.error("Failed to load data", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAccountLabel = (accountNumber) => {
+    const account = accounts.find((a) => a.account_number === accountNumber);
+    return account ? account.label : `Account ${accountNumber}`;
+  };
+
+  const formatTransactionType = (type) => {
+    switch (type) {
+      case "transfer-in":
+        return "Transfer In";
+      case "transfer-out":
+        return "Transfer Out";
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  };
+
+  const getAmountColor = (type) => {
+    if (type === "deposit" || type === "transfer-in") return "#51cf66";
+    if (type === "withdrawal" || type === "transfer-out") return "#ff6b6b";
+    return "var(--ink)";
+  };
+
+  const getAmountPrefix = (type) => {
+    if (type === "deposit" || type === "transfer-in") return "+";
+    if (type === "withdrawal" || type === "transfer-out") return "-";
+    return "";
+  };
+
+  const filteredTransactions = transactions.filter((tx) => {
+    if (
+      filterAccount !== "all" &&
+      tx.account_number !== parseInt(filterAccount)
+    ) {
       return false;
     }
-    if (filterCategory && tx.category !== filterCategory) {
+    if (
+      filterCategory &&
+      tx.category.toLowerCase() !== filterCategory.toLowerCase()
+    ) {
       return false;
     }
     if (startDate && new Date(tx.date) < new Date(startDate)) {
@@ -23,6 +83,15 @@ export default function History() {
     }
     return true;
   });
+
+  // Get unique categories for filter
+  const categories = [...new Set(transactions.map((tx) => tx.category))];
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40, textAlign: "center" }}>Loading history...</div>
+    );
+  }
 
   return (
     <div className="grid">
@@ -40,9 +109,9 @@ export default function History() {
               onChange={(e) => setFilterAccount(e.target.value)}
             >
               <option value="all">All Accounts</option>
-              {user.accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name}
+              {accounts.map((acc) => (
+                <option key={acc.account_number} value={acc.account_number}>
+                  {acc.label}
                 </option>
               ))}
             </select>
@@ -72,7 +141,7 @@ export default function History() {
               onChange={(e) => setFilterCategory(e.target.value)}
             >
               <option value="">All Categories</option>
-              {user.categories.map((cat) => (
+              {categories.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
@@ -95,7 +164,7 @@ export default function History() {
                 <tr>
                   <th>Date/Time</th>
                   <th>Type</th>
-                  <th>Account(s)</th>
+                  <th>Account</th>
                   <th>Category</th>
                   <th>Amount</th>
                 </tr>
@@ -104,15 +173,13 @@ export default function History() {
                 {filteredTransactions.map((tx) => (
                   <tr key={tx.id}>
                     <td>{new Date(tx.date).toLocaleString()}</td>
-                    <td style={{ textTransform: "capitalize" }}>{tx.type}</td>
-                    <td>{tx.account}</td>
+                    <td>{formatTransactionType(tx.type)}</td>
+                    <td>{getAccountLabel(tx.account_number)}</td>
                     <td>
                       <span className="badge">{tx.category}</span>
                     </td>
-                    <td
-                      style={{ color: tx.amount >= 0 ? "#51cf66" : "#ff6b6b" }}
-                    >
-                      {tx.amount >= 0 ? "+" : ""}$
+                    <td style={{ color: getAmountColor(tx.type) }}>
+                      {getAmountPrefix(tx.type)}$
                       {Math.abs(tx.amount).toFixed(2)}
                     </td>
                   </tr>

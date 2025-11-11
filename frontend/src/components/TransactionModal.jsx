@@ -1,15 +1,18 @@
 import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { api } from "../utils/api";
 
-export default function TransactionModal({ type, account, onClose }) {
-  const { user, login } = useAuth();
+export default function TransactionModal({
+  type,
+  account,
+  onClose,
+  onSuccess,
+}) {
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
-  const [newCategory, setNewCategory] = useState("");
-  const [showNewCategory, setShowNewCategory] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -19,47 +22,38 @@ export default function TransactionModal({ type, account, onClose }) {
       return;
     }
 
-    if (type === "withdraw" && amountNum > account.balance) {
-      setError("Insufficient funds");
+    if (!category.trim()) {
+      setError("Please enter a category");
       return;
     }
 
-    const finalCategory = showNewCategory ? newCategory : category;
-    if (!finalCategory) {
-      setError("Please select or create a category");
-      return;
+    setLoading(true);
+
+    try {
+      const data =
+        type === "deposit"
+          ? await api.deposit({
+              account_number: account.account_number,
+              amount: amountNum,
+              category: category.trim(),
+            })
+          : await api.withdraw({
+              account_number: account.account_number,
+              amount: amountNum,
+              category: category.trim(),
+            });
+
+      if (data.message && data.message.includes("successful")) {
+        onSuccess();
+        onClose();
+      } else {
+        setError(data.message || "Transaction failed");
+      }
+    } catch (error) {
+      setError("Unable to process transaction");
+    } finally {
+      setLoading(false);
     }
-
-    // Update user data
-    const updatedUser = { ...user };
-    const accountIndex = updatedUser.accounts.findIndex(
-      (a) => a.id === account.id
-    );
-
-    if (type === "deposit") {
-      updatedUser.accounts[accountIndex].balance += amountNum;
-    } else {
-      updatedUser.accounts[accountIndex].balance -= amountNum;
-    }
-
-    // Add category if new
-    if (showNewCategory && !updatedUser.categories.includes(newCategory)) {
-      updatedUser.categories.push(newCategory);
-    }
-
-    // Add transaction
-    updatedUser.transactions.unshift({
-      id: Date.now(),
-      date: new Date().toISOString(),
-      type: type,
-      account: account.name,
-      accountId: account.id,
-      amount: type === "deposit" ? amountNum : -amountNum,
-      category: finalCategory,
-    });
-
-    login(updatedUser);
-    onClose();
   };
 
   return (
@@ -79,7 +73,7 @@ export default function TransactionModal({ type, account, onClose }) {
     >
       <div className="card" style={{ width: "min(500px, 90%)", maxWidth: 500 }}>
         <h2>
-          {type === "deposit" ? "Deposit" : "Withdraw"} - {account.name}
+          {type === "deposit" ? "Deposit" : "Withdraw"} - {account.label}
         </h2>
         {error && <p style={{ color: "#ff6b6b", marginBottom: 12 }}>{error}</p>}
 
@@ -91,53 +85,26 @@ export default function TransactionModal({ type, account, onClose }) {
             placeholder="Amount"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            disabled={loading}
           />
 
-          {!showNewCategory ? (
-            <>
-              <select
-                className="select"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                <option value="">Select category...</option>
-                {user.categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="btn ghost"
-                onClick={() => setShowNewCategory(true)}
-                type="button"
-              >
-                + Create New Category
-              </button>
-            </>
-          ) : (
-            <>
-              <input
-                className="input"
-                placeholder="New category name"
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-              />
-              <button
-                className="btn ghost"
-                onClick={() => setShowNewCategory(false)}
-                type="button"
-              >
-                ← Back to existing categories
-              </button>
-            </>
-          )}
+          <input
+            className="input"
+            placeholder="Category (e.g., Food, Bills, Paycheck)"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            disabled={loading}
+          />
 
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn" onClick={handleSubmit}>
-              {type === "deposit" ? "Deposit" : "Withdraw"}
+            <button className="btn" onClick={handleSubmit} disabled={loading}>
+              {loading
+                ? "Processing..."
+                : type === "deposit"
+                ? "Deposit"
+                : "Withdraw"}
             </button>
-            <button className="btn ghost" onClick={onClose}>
+            <button className="btn ghost" onClick={onClose} disabled={loading}>
               Cancel
             </button>
           </div>
